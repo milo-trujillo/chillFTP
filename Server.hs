@@ -33,17 +33,20 @@ listenLoop servSock = do
 	_ <- forkIO (handleClient client)
 	listenLoop servSock
 
--- Handles an individual client command connection
+-- Handles authenticating an individual client command connection
+-- Then hands off the connection to clientLoop
 handleClient :: (Socket, SockAddr) -> IO ()
 handleClient (sock, addr) = do
 	putStrLn ("New connection from " ++ show(addr))
-	s <- socketToHandle sock ReadWriteMode	-- Convert socket to filehandle
+	s <- socketToHandle sock ReadWriteMode
+	-- FTP puts '\r\n' at the end of all lines, we need to strip it
 	hSetNewlineMode s (NewlineMode { inputNL =  CRLF, outputNL = LF })
 	hPutStrLn s "220 Server ready."
 	line <- hGetLine s
 	let (command, user) = makeCommand line
 	if (command == "USER" && (user == "ftp" || user == "anonymous")) then do
 		hPutStrLn s "230 Login successful."
+		clientLoop s
 		hClose s
 	else do
 		if (command == "USER") then do
@@ -52,3 +55,20 @@ handleClient (sock, addr) = do
 		else do
 			hPutStrLn s "530 Not logged in."
 			hClose s
+
+-- Handles all client commands post-login
+clientLoop :: Handle -> IO ()
+clientLoop s = do
+	line <- hGetLine s
+	let (command, args) = makeCommand line
+	case command of
+		"QUIT"	-> (hPutStrLn s "231 Goodbye.") >> hClose s
+		"SYST"	-> (hPutStrLn s "215 UNIX Type: L8")
+		_		-> (hPutStrLn s "502 Command not implemented")  >>
+					putStrLn ("Unknown: " ++ command ++ " (" ++ args ++ ")")
+	-- Now that we're done with the command, figure out if we need to read again
+	streamOpen <- hIsOpen s
+	if streamOpen then
+		clientLoop s
+	else
+		return ()
