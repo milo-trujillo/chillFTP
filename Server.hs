@@ -8,14 +8,13 @@ import Network.Socket			-- For sockets
 import Control.Concurrent		-- For threads and channels
 
 import FTP						-- For interpreting FTP commands
+import PASV						-- For handling the passive data connection
 
 -- Global config vars
 max_connections	:: Int
 command_port	:: PortNumber
-data_port		:: PortNumber
 max_connections	= 30
 command_port	= 21
-data_port		= 20
 
 -- Does some initial setup, eventually folds into listenLoop
 main :: IO ()
@@ -62,8 +61,16 @@ clientLoop s = do
 	line <- hGetLine s
 	let (command, args) = makeCommand line
 	case command of
-		"QUIT"	-> (hPutStrLn s "231 Goodbye.") >> hClose s
-		"SYST"	-> (hPutStrLn s "215 UNIX Type: L8")
+		"QUIT"	->	hPutStrLn s "231 Goodbye." >> hClose s
+		"SYST"	->	hPutStrLn s "215 UNIX Type: L8"
+		"FEAT"	->	hPutStrLn s "211-Features:" >>
+					hPutStrLn s " PASV" >>
+					hPutStrLn s " SIZE" >>
+					hPutStrLn s "211 End"
+		"PASV"	->	startPASV
+					where startPASV = do
+						port <- openPASV
+						hPutStrLn s ("230 PASV open on port " ++ show port)
 		_		-> (hPutStrLn s "502 Command not implemented")  >>
 					putStrLn ("Unknown: " ++ command ++ " (" ++ args ++ ")")
 	-- Now that we're done with the command, figure out if we need to read again
