@@ -1,16 +1,20 @@
 # Set compilers
 HC = ghc
-RC = racket
+RC = raco
+
+# Set options for the Haskell and Racket compilers
+HFLAGS = -Wall --make
+RFLAGS = exe
 
 server:
-	$(HC) Server.hs
+	$(HC) $(HFLAGS) Server.hs
 
 client:
-	$(RC) Client.rkt
+	$(RC) $(RFLAGS) Client.rkt
 
 all:
-	$(HC) Server.hs
-	$(RC) Client.rkt
+	$(HC) $(HFLAGS) Server.hs
+	$(RC) $(RFLAGS) Client.rkt
 
 clean:
 	rm -f *.o *.hi Client Server
