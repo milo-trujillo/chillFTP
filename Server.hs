@@ -6,15 +6,16 @@
 import System.IO				-- For handles
 import Network.Socket			-- For sockets
 import Control.Concurrent		-- For threads and channels
-import Control.Exception		-- For exception handling
+
+import FTP						-- For interpreting FTP commands
 
 -- Global config vars
-max_connections = 30
-command_port = 21
-data_port = 20
-
--- Commands are defined as (Command, Arguments)
-type Command = (String, String)
+max_connections	:: Int
+command_port	:: PortNumber
+data_port		:: PortNumber
+max_connections	= 30
+command_port	= 21
+data_port		= 20
 
 -- Does some initial setup, eventually folds into listenLoop
 main :: IO ()
@@ -29,25 +30,25 @@ main = do
 listenLoop :: Socket -> IO ()
 listenLoop servSock = do
 	client <- Network.Socket.accept servSock
-	forkIO (handleClient client)
+	_ <- forkIO (handleClient client)
 	listenLoop servSock
 
 -- Handles an individual client command connection
 handleClient :: (Socket, SockAddr) -> IO ()
 handleClient (sock, addr) = do
+	putStrLn ("New connection from " ++ show(addr))
 	s <- socketToHandle sock ReadWriteMode	-- Convert socket to filehandle
 	hSetNewlineMode s (NewlineMode { inputNL =  CRLF, outputNL = LF })
-	hPutStr s "220 Server ready.\n"
-	{-
-		TODO: Break this into command interpretation, like:
-			user <- getUser (getCommand (hGetLine s))
-		Then the if statement can just compare usernames, not commands
-	-}
-	user <- hGetLine s
-	if (user /= "USER ftp" && user /= "USER anonymous") then do
-		hPutStrLn s "530 Anonymous login only."
+	hPutStrLn s "220 Server ready."
+	line <- hGetLine s
+	let (command, user) = makeCommand line
+	if (command == "USER" && (user == "ftp" || user == "anonymous")) then do
+		hPutStrLn s "230 Login successful."
 		hClose s
 	else do
-		hPutStrLn s "230 Login successful.\n"
-		hPutStrLn s "231 Goodbye\n"
-		hClose s
+		if (command == "USER") then do
+			hPutStrLn s "530 Anonymous login only."
+			hClose s
+		else do
+			hPutStrLn s "530 Not logged in."
+			hClose s
