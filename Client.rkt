@@ -22,20 +22,26 @@
 
   ;connect to a server, and perform ftp stuffs
   (define (connect ip)
+    ;throw an exception if we can't connect to the server
     (with-handlers ([exn:fail:network?
 		     (lambda (exn)
-		       (printf "Couldn't connect to ~a :: ~a\n" ip exn)
-		       (error "Sorry :("))])
+		       (error "Couldn't connect to" ip exn))])
+      ;bind the input and output streams to variables
       (define-values (control-in control-out) (tcp-connect ip 21))
       (let loop ()
+	;print all the information coming from the server
 	(for ([incoming (in-lines control-in)])
+	  ;and execute control seqs, they do nothing now
 	  (control-execute (get-control incoming)
 			   control-in
 			   control-out)
 	  (display incoming)
 	  (newline))
-	(send-message (read-line) control-out)
-	(loop))
+	(let ((message (read-line)))
+	  ;send user input to the server, currently blocks..
+	  (send-message message control-out)
+	  (unless (equal? (string-upcase message) "QUIT")
+	    (loop))))
       (close-connection control-in control-out)))
 
   (provide connect get-control))
