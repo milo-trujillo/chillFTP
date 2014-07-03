@@ -13,9 +13,7 @@ import Control.Concurrent
 max_connections :: Int
 max_connections = 1
 
--- Opens a new passive ftp connection, returns the PASV string
--- PASV response strings are in the format "h1,h2,h3,h4,p1,p2" as described
--- here: http://cr.yp.to/ftp/retr.html
+-- Opens a new passive ftp connection, returns the port number
 openPASV :: IO Int
 openPASV = do
 	sock <- socket AF_INET Stream 0		-- Make new socket
