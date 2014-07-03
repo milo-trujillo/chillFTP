@@ -36,7 +36,9 @@ listenLoop servSock = do
 -- Then hands off the connection to clientLoop
 handleClient :: (Socket, SockAddr) -> IO ()
 handleClient (sock, addr) = do
-	putStrLn ("New connection from " ++ show(addr))
+	putStr ("New connection from " ++ show(addr))
+	origin <- getSocketName sock
+	putStrLn (" to " ++ (getFTPAddr origin))
 	s <- socketToHandle sock ReadWriteMode
 	-- FTP puts '\r\n' at the end of all lines, we need to strip it
 	hSetNewlineMode s (NewlineMode { inputNL =  CRLF, outputNL = LF })
