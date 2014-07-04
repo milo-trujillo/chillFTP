@@ -1,5 +1,6 @@
 {-
-	This module is responsible for interpreting strings as FTP commands.
+	This module is responsible for converting between Haskell data types and 
+	data formats used by FTP.
 -}
 
 module FTP where
