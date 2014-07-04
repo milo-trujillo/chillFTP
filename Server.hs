@@ -47,7 +47,7 @@ handleClient (sock, addr) = do
 	let (command, user) = makeCommand line
 	if (command == "USER" && (user == "ftp" || user == "anonymous")) then do
 		hPutStrLn s "230 Login successful."
-		clientLoop s
+		clientLoop s addr
 		hClose s
 	else do
 		if (command == "USER") then do
@@ -58,8 +58,8 @@ handleClient (sock, addr) = do
 			hClose s
 
 -- Handles all client commands post-login
-clientLoop :: Handle -> IO ()
-clientLoop s = do
+clientLoop :: Handle -> SockAddr -> IO ()
+clientLoop s addr = do
 	line <- hGetLine s
 	let (command, args) = makeCommand line
 	case command of
@@ -71,13 +71,15 @@ clientLoop s = do
 					hPutStrLn s "211 End"
 		"PASV"	->	startPASV
 					where startPASV = do
-						port <- openPASV
-						hPutStrLn s ("230 PASV open on port " ++ show port)
+						portno <- openPASV
+						let port = (getFTPPort portno)
+						let address = (getFTPAddr addr)
+						hPutStrLn s ("227 =" ++ address ++ "," ++ port)
 		_		-> (hPutStrLn s "502 Command not implemented")  >>
 					putStrLn ("Unknown: " ++ command ++ " (" ++ args ++ ")")
 	-- Now that we're done with the command, figure out if we need to read again
 	streamOpen <- hIsOpen s
 	if streamOpen then
-		clientLoop s
+		clientLoop s addr
 	else
 		return ()
