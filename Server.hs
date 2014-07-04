@@ -1,6 +1,8 @@
 {-
-	This server is an incredibly simple TCP FTP daemon. It's probably missing
-	a ton of features and might not be compatible with the full FTP standard.
+	This server is a stripped down ftpd, supporting only passive mode.
+	It is intended as an exercise rather than production code.
+
+	This module is responsible for daemonization and the control port.
 -}
 
 import System.IO				-- For handles
@@ -38,7 +40,7 @@ handleClient :: (Socket, SockAddr) -> IO ()
 handleClient (sock, addr) = do
 	putStr ("New connection from " ++ show(addr))
 	origin <- getSocketName sock
-	putStrLn (" to " ++ (getFTPAddr origin))
+	putStrLn ("(" ++ (getFTPAddr addr) ++ ") to " ++ (getFTPAddr origin))
 	s <- socketToHandle sock ReadWriteMode
 	-- FTP puts '\r\n' at the end of all lines, we need to strip it
 	hSetNewlineMode s (NewlineMode { inputNL =  CRLF, outputNL = LF })
@@ -47,7 +49,8 @@ handleClient (sock, addr) = do
 	let (command, user) = makeCommand line
 	if (command == "USER" && (user == "ftp" || user == "anonymous")) then do
 		hPutStrLn s "230 Login successful."
-		clientLoop s addr
+		pasvChan <- newChan
+		clientLoop s addr pasvChan
 		hClose s
 	else do
 		if (command == "USER") then do
@@ -58,28 +61,33 @@ handleClient (sock, addr) = do
 			hClose s
 
 -- Handles all client commands post-login
-clientLoop :: Handle -> SockAddr -> IO ()
-clientLoop s addr = do
+clientLoop :: Handle -> SockAddr -> Chan Command -> IO ()
+clientLoop s addr pasv = do
 	line <- hGetLine s
 	let (command, args) = makeCommand line
 	case command of
-		"QUIT"	->	hPutStrLn s "231 Goodbye." >> hClose s
+		"QUIT"	->	hPutStrLn s "231 Goodbye." >> 
+					hClose s >> 
+					writeChan pasv (command, args)
 		"SYST"	->	hPutStrLn s "215 UNIX Type: L8"
 		"FEAT"	->	hPutStrLn s "211-Features:" >>
 					hPutStrLn s " PASV" >>
 					hPutStrLn s " SIZE" >>
 					hPutStrLn s "211 End"
+		"LIST"	->	writeChan pasv (command, args)
 		"PASV"	->	startPASV
 					where startPASV = do
-						portno <- openPASV
-						let port = (getFTPPort portno)
 						let address = (getFTPAddr addr)
-						hPutStrLn s ("227 =" ++ address ++ "," ++ port)
+						writeChan pasv ("PASV", address)
+						portno <- (openPASV pasv)
+						let port = (getFTPPort portno)
+						hPutStr s ("227 Entering Passive mode (" ++ address )
+						hPutStrLn s ("," ++ port ++ ").")
 		_		-> (hPutStrLn s "502 Command not implemented")  >>
 					putStrLn ("Unknown: " ++ command ++ " (" ++ args ++ ")")
 	-- Now that we're done with the command, figure out if we need to read again
 	streamOpen <- hIsOpen s
 	if streamOpen then
-		clientLoop s addr
+		clientLoop s addr pasv
 	else
 		return ()
