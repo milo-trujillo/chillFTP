@@ -34,3 +34,15 @@ getFTPAddr address = let addr = (show address)
 			| ([x] == ".") = [','] ++ (parse xs)
 			| otherwise = [x] ++ (parse xs)
 		parse [] = ""
+
+-- Takes a port number, returns it in FTP format "p1,p2" 
+-- where (p1*256) + p2 == port
+getFTPPort :: Int -> String
+getFTPPort port = ((show p1) ++ "," ++ (show p2))
+	where
+		p2 = port `mod` 256		-- Equivalent to "mod port 256"
+		p1 = (port - p2) `div` 256
+
+-- Easy conversion from a port number to an integer
+portToInt :: PortNumber -> Int
+portToInt portno = (read (show (portno)) :: Int)
