@@ -3,7 +3,7 @@ HC = ghc
 RC = raco
 
 # Set options for the Haskell and Racket compilers
-HFLAGS = -Wall --make
+HFLAGS = -Wall --make -threaded # -O2
 RFLAGS = exe
 
 server:
