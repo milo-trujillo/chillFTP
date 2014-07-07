@@ -62,6 +62,8 @@ handlePASV :: Handle -> Chan Command -> IO ()
 handlePASV s commands = do
 	(command, _) <- readChan commands
 	putStrLn ("Read command: " ++ command)	-- DEBUG
+	socketOpen <- hIsWritable s -- DEBUG
+	putStrLn ("Socket is ready for writing: " ++ show(socketOpen)) -- DEBUG
 	case command of
 		"LIST"	->	hPutStrLn s "150 Opening ASCII connection for file list" >>
 					hPutStrLn s "... No files found ..." >>
