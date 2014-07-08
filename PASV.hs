@@ -62,7 +62,7 @@ acceptPASV data_listen allowed requests = do
 	else do
 		hPutStrLn s "Access denied."
 		hClose s
-	acceptPASV data_listen allowed requests
+		acceptPASV data_listen allowed requests
 
 -- Handles a passive ftp connection once a user connects
 handlePASV :: Handle -> Chan Request -> IO ()
