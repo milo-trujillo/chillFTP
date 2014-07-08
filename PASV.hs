@@ -55,16 +55,14 @@ acceptPASV data_listen allowed requests = do
 	(sock, address) <- Network.Socket.accept data_listen
 	s <- socketToHandle sock ReadWriteMode
 	hSetNewlineMode s (NewlineMode { inputNL = CRLF, outputNL = CRLF })
-	hSetBuffering s NoBuffering
 	let addr = getFTPAddr address
 	putStrLn ("Opened PASV from " ++ addr)	-- DEBUG
 	if (addr == allowed) then do
 		handlePASV s requests
-		acceptPASV data_listen allowed requests
 	else do
 		hPutStrLn s "Access denied."
 		hClose s
-		acceptPASV data_listen allowed requests
+	acceptPASV data_listen allowed requests
 
 -- Handles a passive ftp connection once a user connects
 handlePASV :: Handle -> Chan Request -> IO ()
