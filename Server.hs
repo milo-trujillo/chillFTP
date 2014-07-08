@@ -44,6 +44,7 @@ handleClient (sock, addr) = do
 	s <- socketToHandle sock ReadWriteMode
 	-- FTP puts '\r\n' at the end of all lines, we need to strip it
 	hSetNewlineMode s (NewlineMode { inputNL =  CRLF, outputNL = LF })
+	hSetBuffering s LineBuffering
 	hPutStrLn s "220 Server ready."
 	line <- hGetLine s
 	let (command, user) = makeCommand line
@@ -61,27 +62,43 @@ handleClient (sock, addr) = do
 			hClose s
 
 -- Handles all client commands post-login
-clientLoop :: Handle -> SockAddr -> Chan Command -> IO ()
+clientLoop :: Handle -> SockAddr -> Chan Request -> IO ()
 clientLoop s addr pasv = do
 	line <- hGetLine s
 	let (command, args) = makeCommand line
 	case command of
-		"QUIT"	->	hPutStrLn s "231 Goodbye." >> 
-					hClose s >> 
-					writeChan pasv (command, args)
+		"QUIT"	->	quitClient
+					where quitClient = do
+						hPutStrLn s "231 Goodbye." 
+						hClose s
+						callback <- newEmptyMVar
+						writeChan pasv ((command, args), callback)
+					-- We'll hardcode the PWD now for testing
 		"SYST"	->	hPutStrLn s "215 UNIX Type: L8"
 		"FEAT"	->	hPutStrLn s "211-Features:" >>
 					hPutStrLn s " PASV" >>
 					hPutStrLn s " SIZE" >>
 					hPutStrLn s "211 End"
-		"LIST"	->	writeChan pasv (command, args)
+		"PWD"	->	hPutStrLn s "257 \"/\" is current directory."
+		"LIST"	->	listFiles
+					where listFiles = do
+						hPutStrLn s "150 Opening ASCII connection for file list"
+						callback <- newEmptyMVar
+						writeChan pasv ((command, args), callback)
+						status <- takeMVar callback
+						case status of
+							Done	->	hPutStrLn s "226 Transfer complete fools."
+							PermDenied	->	hPutStrLn s "550 Permission denied."
+							NotFound	->	hPutStrLn s "550 Folder not found."
+							Error	->	hPutStrLn s "550 Unexpected error."
 		"PASV"	->	startPASV
 					where startPASV = do
 						let address = (getFTPAddr addr)
-						writeChan pasv ("PASV", address)
+						callback <- newEmptyMVar
+						writeChan pasv (("PASV", address), callback)
 						portno <- (openPASV pasv)
 						let port = (getFTPPort portno)
-						hPutStr s ("227 Entering Passive mode (" ++ address )
+						hPutStr s ("227 Entering Passive Mode (" ++ address )
 						hPutStrLn s ("," ++ port ++ ").")
 		_		-> (hPutStrLn s "502 Command not implemented")  >>
 					putStrLn ("Unknown: " ++ command ++ " (" ++ args ++ ")")
