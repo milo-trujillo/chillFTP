@@ -2,7 +2,7 @@
 	This server is a stripped down ftpd, supporting only passive mode.
 	It is intended as an exercise rather than production code.
 
-	This module is responsible for daemonization and the control port.
+	This module is responsible for daemonization, chrooting, and listening.
 -}
 
 module Main (main) where
