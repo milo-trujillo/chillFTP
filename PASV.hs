@@ -69,9 +69,7 @@ handlePASV s requests = do
 	putStrLn ("Read command: " ++ command)	-- DEBUG
 	case command of
 		"LIST"	->	do
-			response <- newEmptyMVar
-			names <- getFileList args response
-			result <- takeMVar response
+			(names, result) <- getFileList args
 			if (result == Done) then do
 				forM_ names (hPutStrLn s)
 				putMVar callback Done
