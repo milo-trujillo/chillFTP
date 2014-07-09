@@ -30,7 +30,8 @@ handleClient (sock, addr) = do
 	if (command == "USER" && (user == "ftp" || user == "anonymous")) then do
 		hPutStrLn s "230 Login successful."
 		pasvChan <- newChan
-		clientLoop s addr pasvChan
+		path <- newMVar "/"
+		clientLoop s addr pasvChan path
 		hClose s
 	else do
 		if (command == "USER") then do
@@ -41,49 +42,69 @@ handleClient (sock, addr) = do
 			hClose s
 
 -- Handles all client commands post-login
-clientLoop :: Handle -> SockAddr -> Chan Request -> IO ()
-clientLoop s addr pasv = do
+clientLoop :: Handle -> SockAddr -> Chan Request -> MVar String -> IO ()
+clientLoop s addr pasv wd = do
 	line <- hGetLine s
 	let (command, args) = makeCommand line
 	case command of
-		"QUIT"	->	quitClient
-					where quitClient = do
-						hPutStrLn s "231 Goodbye." 
-						hClose s
-						callback <- newEmptyMVar
-						writeChan pasv ((command, args), callback)
-					-- We'll hardcode the PWD now for testing
+		"QUIT"	->	do
+			hPutStrLn s "231 Goodbye." 
+			hClose s
+			callback <- newEmptyMVar
+			writeChan pasv ((command, args), callback)
 		"SYST"	->	hPutStrLn s "215 UNIX Type: L8"
-		"FEAT"	->	hPutStrLn s "211-Features:" >>
-					hPutStrLn s " PASV" >>
-					hPutStrLn s " SIZE" >>
-					hPutStrLn s "211 End"
-		"PWD"	->	hPutStrLn s "257 \"/\" is current directory."
-		"LIST"	->	listFiles
-					where listFiles = do
-						hPutStrLn s "150 Opening ASCII connection for file list"
-						callback <- newEmptyMVar
-						writeChan pasv ((command, args), callback)
-						status <- takeMVar callback
-						case status of
-							Done	->	hPutStrLn s "226 Transfer complete fools."
-							PermDenied	->	hPutStrLn s "550 Permission denied."
-							NotFound	->	hPutStrLn s "550 Folder not found."
-							Error	->	hPutStrLn s "550 Unexpected error."
-		"PASV"	->	startPASV
-					where startPASV = do
-						let address = (getFTPAddr addr)
-						callback <- newEmptyMVar
-						writeChan pasv (("PASV", address), callback)
-						portno <- (openPASV pasv)
-						let port = (getFTPPort portno)
-						hPutStr s ("227 Entering Passive Mode (" ++ address )
-						hPutStrLn s ("," ++ port ++ ").")
+		"FEAT"	->	do
+			hPutStrLn s "211-Features:"
+			hPutStrLn s " PASV"
+			hPutStrLn s " SIZE"
+			hPutStrLn s "211 End"
+		"PWD"	->	do
+			path <- viewMVar wd
+			hPutStrLn s ("257 \"" ++ path ++ "\" is current directory.")
+		"CWD"	->	do
+			status <- isValidWD args
+			case status of
+				PermDenied	->	hPutStrLn s "550 Permission denied."
+				NotFound	->	hPutStrLn s "550 Folder not found."
+				Error		->	hPutStrLn s "550 Unexpected error."
+				Done		-> do
+					_ <- swapMVar wd args
+					hPutStrLn s "250 CWD successful."
+		"LIST"	->	do
+			hPutStrLn s "150 Opening ASCII connection for file list"
+			callback <- newEmptyMVar
+			if (length args /= 0) then
+				writeChan pasv ((command, args), callback)
+			else do
+				path <- viewMVar wd
+				writeChan pasv ((command, path), callback)
+			status <- takeMVar callback
+			case status of
+				Done	->	hPutStrLn s "226 Transfer complete fools."
+				PermDenied	->	hPutStrLn s "550 Permission denied."
+				NotFound	->	hPutStrLn s "550 Folder not found."
+				Error	->	hPutStrLn s "550 Unexpected error."
+		"PASV"	->	do
+			let address = (getFTPAddr addr)
+			callback <- newEmptyMVar
+			writeChan pasv (("PASV", address), callback)
+			portno <- (openPASV pasv)
+			let port = (getFTPPort portno)
+			hPutStr s ("227 Entering Passive Mode (" ++ address )
+			hPutStrLn s ("," ++ port ++ ").")
 		_		-> (hPutStrLn s "502 Command not implemented")  >>
 					putStrLn ("Unknown: " ++ command ++ " (" ++ args ++ ")")
 	-- Now that we're done with the command, figure out if we need to read again
 	streamOpen <- hIsOpen s
 	if streamOpen then
-		clientLoop s addr pasv
+		clientLoop s addr pasv wd
 	else
 		return ()
+
+-- Returns the contents of an MVar without modifying it
+-- WARNING: NOT GUARANTEED TO BE ATOMIC
+viewMVar :: MVar a -> IO a
+viewMVar var = do
+	foo <- takeMVar var
+	putMVar var foo
+	return foo
