@@ -5,13 +5,13 @@
 
 module Filesystem where
 
-import Control.Concurrent		-- For MVars
 import System.Directory			-- For filesystem interaction
 
 -- Status messages report when a task is complete, or what kind of problem
 -- has been encountered.
 data Status = Done | PermDenied | NotFound | Error	deriving (Eq)
 
+-- Checks if a directory exists and can be searched through
 isValidWD :: String -> IO Status
 isValidWD path = do
 	folderExists <- doesDirectoryExist path
@@ -24,13 +24,12 @@ isValidWD path = do
 	else
 		return NotFound
 
-getFileList :: String -> MVar Status -> IO [String]
-getFileList path result = do
+-- Returns a list of files (if possible), and a status indicating any problem
+getFileList :: String -> IO ([String], Status)
+getFileList path = do
 	available <- isValidWD path
 	if (available /= Done) then do
-		putMVar result available
-		return []
+		return ([], available)
 	else do
 		names <- getDirectoryContents path
-		putMVar result Done
-		return names
+		return (names, Done)
