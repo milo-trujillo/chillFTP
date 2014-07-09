@@ -7,7 +7,7 @@ module Control (handleClient) where
 
 import System.IO				-- For handles
 import Network.Socket			-- For sockets
-import Control.Concurrent		-- For threads and channels
+import Control.Concurrent		-- For threads, channels, and MVars
 
 import FTP						-- For interpreting FTP commands
 import PASV						-- For handling the passive data connection
@@ -62,6 +62,8 @@ clientLoop s addr pasv wd = do
 			path <- viewMVar wd
 			hPutStrLn s ("257 \"" ++ path ++ "\" is current directory.")
 		"CWD"	->	do
+			-- TODO: Prepend current path to argument if it's not absolute
+			--path <- validatePath args
 			status <- isValidWD args
 			case status of
 				PermDenied	->	hPutStrLn s "550 Permission denied."
@@ -71,6 +73,7 @@ clientLoop s addr pasv wd = do
 					_ <- swapMVar wd args
 					hPutStrLn s "250 CWD successful."
 		"LIST"	->	do
+			-- TODO: Validate input like for CWD
 			hPutStrLn s "150 Opening ASCII connection for file list"
 			callback <- newEmptyMVar
 			if (length args /= 0) then
