@@ -7,9 +7,10 @@
 
 module PASV (openPASV, Request) where
 
-import System.IO
-import Network.Socket
-import Control.Concurrent
+import System.IO			-- For handles
+import Network.Socket		-- For IO
+import Control.Concurrent	-- For Threads, Channels, and MVars
+import Control.Monad		-- For forM_
 
 import FTP			-- For commands
 import Filesystem	-- For file IO and Status
@@ -64,11 +65,18 @@ acceptPASV data_listen allowed requests = do
 -- Handles a passive ftp connection once a user connects
 handlePASV :: Handle -> Chan Request -> IO ()
 handlePASV s requests = do
-	((command, _), callback) <- readChan requests
+	((command, args), callback) <- readChan requests
 	putStrLn ("Read command: " ++ command)	-- DEBUG
 	case command of
-		"LIST"	->	hPutStrLn s "... No files found ..." >>
-					putMVar callback Done
+		"LIST"	->	do
+			response <- newEmptyMVar
+			names <- getFileList args response
+			result <- takeMVar response
+			if (result == Done) then do
+				forM_ names (hPutStrLn s)
+				putMVar callback Done
+			else
+				putMVar callback result
 		"QUIT"	->	putMVar callback Done
 		_		->	hPutStrLn s "ERROR: Unknown command passed to PASV!" >>
 					putMVar callback Error
