@@ -5,17 +5,14 @@
 	all interaction between the control and data ports is done via a channel.
 -}
 
-module PASV (openPASV, Request, Status(Done, PermDenied, NotFound, Error)) where
+module PASV (openPASV, Request) where
 
 import System.IO
 import Network.Socket
 import Control.Concurrent
 
-import FTP
-
--- Status messages report when a task is complete, or what kind of problem
--- has been encountered.
-data Status = Done | PermDenied | NotFound | Error	deriving (Eq)
+import FTP			-- For commands
+import Filesystem	-- For file IO and Status
 
 -- Passive requests are defined as (ftp command, callback)
 -- The callback reports to the caller the result of the request

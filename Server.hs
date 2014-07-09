@@ -11,6 +11,7 @@ import Control.Concurrent		-- For threads and channels
 
 import FTP						-- For interpreting FTP commands
 import PASV						-- For handling the passive data connection
+import Filesystem				-- For changing directory and Status
 
 -- Global config vars
 max_connections	:: Int
