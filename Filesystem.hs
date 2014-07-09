@@ -5,7 +5,8 @@
 
 module Filesystem where
 
-import System.Directory
+import Control.Concurrent		-- For MVars
+import System.Directory			-- For filesystem interaction
 
 -- Status messages report when a task is complete, or what kind of problem
 -- has been encountered.
@@ -22,3 +23,14 @@ isValidWD path = do
 			return PermDenied
 	else
 		return NotFound
+
+getFileList :: String -> MVar Status -> IO [String]
+getFileList path result = do
+	available <- isValidWD path
+	if (available /= Done) then do
+		putMVar result available
+		return []
+	else do
+		names <- getDirectoryContents path
+		putMVar result Done
+		return names
