@@ -5,6 +5,7 @@
 
 module Filesystem where
 
+import System.Posix.Syslog (syslog, Priority(Notice))		-- For logging
 import System.Directory			-- For filesystem interaction
 
 -- Status messages report when a task is complete, or what kind of problem
@@ -33,3 +34,7 @@ getFileList path = do
 	else do
 		names <- getDirectoryContents path
 		return (names, Done)
+
+-- Shorthand for logging and debugging through the codebase
+logMsg :: String -> IO ()
+logMsg msg = syslog Notice msg
