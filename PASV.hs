@@ -31,7 +31,7 @@ openPASV requests = do
 	bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)
 	listen sock max_connections
 	allowed_addr <- getAddr
-	putStrLn ("Allowing connections from " ++ allowed_addr)
+	logMsg ("Allowing connections from " ++ allowed_addr)
 	_ <- forkIO (acceptPASV sock allowed_addr requests)
 	portno <- socketPort sock
 	return (read (show (portno)) :: Int)
@@ -54,7 +54,7 @@ acceptPASV data_listen allowed requests = do
 	s <- socketToHandle sock ReadWriteMode
 	hSetNewlineMode s (NewlineMode { inputNL = CRLF, outputNL = CRLF })
 	let addr = getFTPAddr address
-	putStrLn ("Opened PASV from " ++ addr)	-- DEBUG
+	logMsg ("Opened PASV from " ++ addr)	-- DEBUG
 	if (addr == allowed) then do
 		handlePASV s requests
 	else do
@@ -66,7 +66,7 @@ acceptPASV data_listen allowed requests = do
 handlePASV :: Handle -> Chan Request -> IO ()
 handlePASV s requests = do
 	((command, args), callback) <- readChan requests
-	putStrLn ("Read command: " ++ command)	-- DEBUG
+	logMsg ("Read command: " ++ command)	-- DEBUG
 	case command of
 		"LIST"	->	do
 			(names, result) <- getFileList args

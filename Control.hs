@@ -17,9 +17,9 @@ import Filesystem				-- For changing directory and Status
 -- Then hands off the connection to clientLoop
 handleClient :: (Socket, SockAddr) -> IO ()
 handleClient (sock, addr) = do
-	putStr ("New connection from " ++ show(addr))
+	logMsg ("New connection from " ++ show(addr))
 	origin <- getSocketName sock
-	putStrLn ("(" ++ (getFTPAddr addr) ++ ") to " ++ (getFTPAddr origin))
+	logMsg ("(" ++ (getFTPAddr addr) ++ ") to " ++ (getFTPAddr origin))
 	s <- socketToHandle sock ReadWriteMode
 	-- FTP puts '\r\n' at the end of all lines, we need to strip it
 	hSetNewlineMode s (NewlineMode { inputNL =  CRLF, outputNL = LF })
@@ -96,7 +96,7 @@ clientLoop s addr pasv wd = do
 			hPutStr s ("227 Entering Passive Mode (" ++ address )
 			hPutStrLn s ("," ++ port ++ ").")
 		_		-> (hPutStrLn s "502 Command not implemented")  >>
-					putStrLn ("Unknown: " ++ command ++ " (" ++ args ++ ")")
+					logMsg ("Unknown: " ++ command ++ " (" ++ args ++ ")")
 	-- Now that we're done with the command, figure out if we need to read again
 	streamOpen <- hIsOpen s
 	if streamOpen then
