@@ -7,10 +7,11 @@
 
 module Main (main) where
 
-import Network.Socket			-- For sockets
-import Control.Concurrent		-- For threads and channels
+import System.Posix.Daemonize (CreateDaemon(..), serviced)	-- For daemonizing
+import Network.Socket										-- For sockets
+import Control.Concurrent									-- Threads, channels
 
-import Control					-- For handleClient
+import Control												-- For handleClient
 
 -- Global config vars
 max_connections	:: Int
@@ -20,12 +21,27 @@ command_port	= 21
 
 -- Does some initial setup, eventually folds into listenLoop
 main :: IO ()
-main = do
+main = serviced ftpServer	-- Start us up as a Unix daemon
+
+ftpServer :: CreateDaemon Socket
+ftpServer = CreateDaemon {
+	privilegedAction = bindServer,	-- The result of bindServer
+	program = listenLoop,			-- is the argument to listenLoop
+	name = Just "chillFTP",
+	user = Just "_ftp",
+	group = Just "nobody",
+	syslogOptions = [],
+	pidfileDirectory = Nothing -- Default is /var/run
+}
+
+-- Binds a socket to the listening port, then returns the socket
+bindServer :: IO Socket
+bindServer = do
 	sock <- socket AF_INET Stream 0		-- Make new socket
 	setSocketOption sock ReuseAddr 1	-- Make reusable listening sock
 	bindSocket sock (SockAddrInet command_port iNADDR_ANY)
 	listen sock max_connections			-- Set max connections
-	listenLoop sock
+	return sock
 
 -- Listens for client, forks off handler
 listenLoop :: Socket -> IO ()
