@@ -2,7 +2,7 @@
 	This server is a stripped down ftpd, supporting only passive mode.
 	It is intended as an exercise rather than production code.
 
-	This module is responsible for daemonization, chrooting, and listening.
+	This module is responsible for daemonization and listening.
 -}
 
 module Main (main) where
@@ -21,7 +21,7 @@ command_port	= 21
 
 -- Does some initial setup, eventually folds into listenLoop
 main :: IO ()
-main = serviced ftpServer	-- Start us up as a Unix daemon
+main = serviced ftpServer	-- Start us up as a Unix service
 
 ftpServer :: CreateDaemon Socket
 ftpServer = CreateDaemon {
