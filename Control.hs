@@ -62,31 +62,29 @@ clientLoop s addr pasv wd = do
 			path <- viewMVar wd
 			hPutStrLn s ("257 \"" ++ path ++ "\" is current directory.")
 		"CWD"	->	do
-			-- TODO: Prepend current path to argument if it's not absolute
-			--path <- validatePath args
-			status <- isValidWD args
-			case status of
-				PermDenied	->	hPutStrLn s "550 Permission denied."
-				NotFound	->	hPutStrLn s "550 Folder not found."
-				Error		->	hPutStrLn s "550 Unexpected error."
-				Done		-> do
-					_ <- swapMVar wd args
+			current <- viewMVar wd
+			(path, result) <- validatePath current args
+			if (result == Done) then do
+				status <- isValidWD path
+				if (status == Done) then do
+					_ <- swapMVar wd path
 					hPutStrLn s "250 CWD successful."
+				else handleStatus s status
+			else handleStatus s result
 		"LIST"	->	do
-			-- TODO: Validate input like for CWD
-			hPutStrLn s "150 Opening ASCII connection for file list"
-			callback <- newEmptyMVar
-			if (length args /= 0) then
-				writeChan pasv ((command, args), callback)
-			else do
-				path <- viewMVar wd
+			current <- viewMVar wd
+			(path, result) <- validatePath current args
+			if (result == Done) then do
+				hPutStrLn s "150 Opening ASCII connection for file list"
+				callback <- newEmptyMVar
 				writeChan pasv ((command, path), callback)
-			status <- takeMVar callback
-			case status of
-				Done	->	hPutStrLn s "226 Transfer complete fools."
-				PermDenied	->	hPutStrLn s "550 Permission denied."
-				NotFound	->	hPutStrLn s "550 Folder not found."
-				Error	->	hPutStrLn s "550 Unexpected error."
+				status <- takeMVar callback
+				if (status == Done) then 
+					hPutStrLn s "226 Transfer complete fools."
+				else
+					handleStatus s status
+			else
+				handleStatus s result
 		"PASV"	->	do
 			let address = (getFTPAddr addr)
 			callback <- newEmptyMVar
@@ -111,3 +109,12 @@ viewMVar var = do
 	foo <- takeMVar var
 	putMVar var foo
 	return foo
+
+-- Handles several regular error messages
+handleStatus :: Handle -> Status -> IO ()
+handleStatus s status = do
+	case status of
+		PermDenied	->	hPutStrLn s "550 Permission denied."
+		NotFound	->	hPutStrLn s "550 Folder not found."
+		Error	->	hPutStrLn s "550 Unexpected error."
+		Done	->	return () -- This should be handled _before_ calling us
