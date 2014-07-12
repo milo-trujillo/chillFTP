@@ -35,6 +35,22 @@ getFileList path = do
 		names <- getDirectoryContents path
 		return (names, Done)
 
+-- Given a working directory and a path, returns a simplified path
+-- The file or directory is also guaranteed to exist, but _not_ be be accessible
+validatePath :: String -> String -> IO (FilePath, Status)
+validatePath wd p
+	| (length p == 0) = return (wd, Done)
+	| (p !! 0 == '/') = (simplify ("." ++ p))
+	| otherwise = (simplify (wd ++ "/" ++ p))
+	where simplify s = do
+		fExists <- doesFileExist s
+		dExists <- doesDirectoryExist s
+		if( fExists || dExists ) then do
+			path <- canonicalizePath s
+			return (path, Done)
+		else
+			return (wd, NotFound)
+
 -- Shorthand for logging and debugging through the codebase
 logMsg :: String -> IO ()
 logMsg msg = syslog Notice msg
