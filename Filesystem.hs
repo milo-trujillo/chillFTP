@@ -6,11 +6,33 @@
 module Filesystem where
 
 import System.Posix.Syslog (syslog, Priority(Notice))		-- For logging
-import System.Directory			-- For filesystem interaction
+import System.Posix							-- For fileSize and getFileStatus
+import System.IO							-- For filehandles
+import System.Directory						-- For filesystem interaction
+import qualified Data.ByteString.Lazy as BL	-- For moving binary data
+--import Control.Exception					-- Handling exceptions
 
 -- Status messages report when a task is complete, or what kind of problem
 -- has been encountered.
 data Status = Done | PermDenied | NotFound | Error	deriving (Eq)
+
+-- Checks if a file exists and is readable
+-- Returns Error if special file (like directory)
+isReadableFile :: String -> IO Status
+isReadableFile path = do
+	isFile <- doesFileExist path
+	if (isFile) then do
+		perms <- getPermissions path
+		if (readable perms) then
+			return Done
+		else
+			return PermDenied
+	else do
+		isDir <- doesDirectoryExist path
+		if (isDir) then
+			return Error -- It's a folder, not a file
+		else
+			return NotFound
 
 -- Checks if a directory exists and can be searched through
 isValidWD :: String -> IO Status
@@ -24,6 +46,12 @@ isValidWD path = do
 			return PermDenied
 	else
 		return NotFound
+
+-- Returns size in bytes of a file
+getFileSize :: String -> IO FileOffset
+getFileSize path = do
+	stat <- getFileStatus path
+	return (fileSize stat)
 
 -- Returns a list of files (if possible), and a status indicating any problem
 getFileList :: String -> IO ([String], Status)
@@ -50,6 +78,16 @@ validatePath wd p
 			return (path, Done)
 		else
 			return (wd, NotFound)
+
+-- Copies from one file handle to another using lazy bytestrings
+copyData :: Handle -> Handle -> IO ()
+copyData fromFile toFile = do
+	contents <- BL.hGetContents fromFile
+	BL.hPut toFile contents
+	hFlush toFile
+	-- TODO: Make exception-safe with something like the following:
+	--handle (\ _ -> logMsg "Error reading or writing file") (BL.hPut toFile contents)
+	--handle (\ _ -> logMsg "Error flushing after data copy") (hFlush toFile)
 
 -- Shorthand for logging and debugging through the codebase
 logMsg :: String -> IO ()

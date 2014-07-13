@@ -85,6 +85,22 @@ clientLoop s addr pasv wd = do
 					handleStatus s status
 			else
 				handleStatus s result
+		"RETR"	->	do
+			current <- viewMVar wd
+			(path, result) <- validatePath current args
+			available <- isReadableFile path
+			if (result == Done && available == Done) then do
+				size <- getFileSize path
+				hPutStr s ("150 Opening BINARY mode data connection for ")
+				hPutStrLn s ("'" ++ args ++ "' (" ++ (show size) ++ " bytes).")
+				callback <- newEmptyMVar
+				writeChan pasv (("RETR", path), callback)
+				status <- takeMVar callback
+				if (status == Done) then 
+					hPutStrLn s "226 Transfer complete fools."
+				else
+					handleStatus s status
+			else handleStatus s available
 		"PASV"	->	do
 			let address = (getFTPAddr addr)
 			callback <- newEmptyMVar
