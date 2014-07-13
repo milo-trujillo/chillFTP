@@ -58,6 +58,9 @@ clientLoop s addr pasv wd = do
 			hPutStrLn s " PASV"
 			hPutStrLn s " SIZE"
 			hPutStrLn s "211 End"
+		-- TODO: Implement real TYPE functionality
+		"TYPE"	->	do -- Stub function to make ftp clients happy
+			hPutStrLn s ("200 Type set to I.")
 		"PWD"	->	do
 			path <- viewMVar wd
 			hPutStrLn s ("257 \"" ++ path ++ "\" is current directory.")
@@ -80,11 +83,20 @@ clientLoop s addr pasv wd = do
 				writeChan pasv ((command, path), callback)
 				status <- takeMVar callback
 				if (status == Done) then 
-					hPutStrLn s "226 Transfer complete fools."
+					hPutStrLn s "226 Transfer complete, fools."
 				else
 					handleStatus s status
 			else
 				handleStatus s result
+		"SIZE"	->	do
+			-- TODO: Disable SIZE command for ASCII transfer mode
+			current <- viewMVar wd
+			(path, result) <- validatePath current args
+			available <- isReadableFile path
+			if (result == Done && available == Done) then do
+				size <- getFileSize path
+				hPutStrLn s ("213 " ++ (show size))
+			else handleStatus s available
 		"RETR"	->	do
 			current <- viewMVar wd
 			(path, result) <- validatePath current args
