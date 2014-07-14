@@ -11,6 +11,10 @@ import System.Posix.Daemonize (CreateDaemon(..), serviced)	-- For daemonizing
 import Network.Socket										-- For sockets
 import Control.Concurrent									-- Threads, channels
 
+-- Needed for debugging only
+import System.Posix.User ( groupID, setGroupID, getGroupEntryForName
+                         , userID, setUserID, getUserEntryForName )
+
 import Control												-- For handleClient
 
 -- Global config vars
@@ -21,7 +25,15 @@ command_port	= 21
 
 -- Does some initial setup, eventually folds into listenLoop
 main :: IO ()
-main = serviced ftpServer	-- Start us up as a Unix service
+-- For release
+--main = serviced ftpServer	-- Start us up as a Unix service
+-- For debug
+main = do
+	sock <- bindServer
+	getGroupEntryForName "nobody" >>= setGroupID . groupID
+	getUserEntryForName "_ftp" >>= setUserID . userID
+	listenLoop sock
+
 
 ftpServer :: CreateDaemon Socket
 ftpServer = CreateDaemon {
