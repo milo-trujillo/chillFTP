@@ -74,18 +74,18 @@ clientLoop s addr pasv wd = do
 					hPutStrLn s "250 CWD successful."
 				else handleStatus s status
 			else handleStatus s result
+		"NLST"	->	do
+			current <- viewMVar wd
+			(path, result) <- validatePath current args
+			if (result == Done) then do
+				listFiles s pasv command path
+			else
+				handleStatus s result
 		"LIST"	->	do
 			current <- viewMVar wd
 			(path, result) <- validatePath current args
 			if (result == Done) then do
-				hPutStrLn s "150 Opening ASCII connection for file list"
-				callback <- newEmptyMVar
-				writeChan pasv ((command, path), callback)
-				status <- takeMVar callback
-				if (status == Done) then 
-					hPutStrLn s "226 Transfer complete, fools."
-				else
-					handleStatus s status
+				listFiles s pasv command path
 			else
 				handleStatus s result
 		"SIZE"	->	do
@@ -129,6 +129,18 @@ clientLoop s addr pasv wd = do
 		clientLoop s addr pasv wd
 	else
 		return ()
+
+-- Lists files over a PASV data connection
+listFiles :: Handle -> Chan Request -> String -> FilePath -> IO ()
+listFiles s pasv command path = do
+	hPutStrLn s "150 Opening ASCII connection for file list"
+	callback <- newEmptyMVar
+	writeChan pasv ((command, path), callback)
+	status <- takeMVar callback
+	if (status == Done) then 
+		hPutStrLn s "226 Transfer complete, fools."
+	else
+		handleStatus s status
 
 -- Returns the contents of an MVar without modifying it
 -- WARNING: NOT GUARANTEED TO BE ATOMIC
