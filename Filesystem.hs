@@ -8,9 +8,10 @@ module Filesystem where
 import System.Posix.Syslog (syslog, Priority(Notice))		-- For logging
 import System.Posix							-- For fileSize and getFileStatus
 import System.IO							-- For filehandles
+--import System.IO.Error						-- For IO errors (like perm denied)
 import System.Directory						-- For filesystem interaction
 import qualified Data.ByteString.Lazy as BL	-- For moving binary data
---import Control.Exception					-- Handling exceptions
+import Control.Exception					-- Handling exceptions
 
 -- Status messages report when a task is complete, or what kind of problem
 -- has been encountered.
@@ -52,6 +53,27 @@ getFileSize :: String -> IO FileOffset
 getFileSize path = do
 	stat <- getFileStatus path
 	return (fileSize stat)
+
+-- Returns an "rwx" style string representation of file permissions
+getFilePerms :: FilePath -> IO String
+getFilePerms path = do
+	perms <- catch (getPermissions path)
+		(\e -> do
+			let err = show (e :: IOException)
+			logMsg ("Error: " ++ err)
+			return emptyPermissions)
+	let permString = ((canRead perms) ++ (canWrite perms) ++ (canExec perms)) 
+	return permString
+	where
+		canRead perms
+			| (readable perms) = "r"
+			| otherwise = "-"
+		canWrite perms
+			| (writable perms) = "w"
+			| otherwise = "-"
+		canExec perms
+			| (executable perms || searchable perms) = "x"
+			| otherwise = "-"
 
 -- Returns a list of files (if possible), and a status indicating any problem
 getFileList :: String -> IO ([String], Status)
