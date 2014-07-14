@@ -11,6 +11,7 @@ import System.IO			-- For handles
 import Network.Socket		-- For IO
 import Control.Concurrent	-- For Threads, Channels, and MVars
 import Control.Monad		-- For forM_
+import Text.Printf			-- For hPrintf
 
 import FTP			-- For commands
 import Filesystem	-- For file IO and Status
@@ -68,10 +69,17 @@ handlePASV s requests = do
 	((command, args), callback) <- readChan requests
 	logMsg ("Read command: " ++ command)	-- DEBUG
 	case command of
-		"LIST"	->	do
+		"NLST"	->	do
 			(names, result) <- getFileList args
 			if (result == Done) then do
 				forM_ names (hPutStrLn s)
+				putMVar callback Done
+			else
+				putMVar callback result
+		"LIST"	->	do
+			(names, result) <- getFileList args
+			if (result == Done) then do
+				forM_ names (displayPerms s args)
 				putMVar callback Done
 			else
 				putMVar callback result
@@ -83,3 +91,9 @@ handlePASV s requests = do
 		_		->	hPutStrLn s "ERROR: Unknown command passed to PASV!" >>
 					putMVar callback Error
 	hClose s
+
+-- Displays file permissions and file name like "rwx            foo"
+displayPerms :: Handle -> FilePath -> FilePath -> IO ()
+displayPerms s path file = do
+	perms <- getFilePerms (path ++ "/" ++ file)
+	hPrintf s "%-20s%s\n" perms file
