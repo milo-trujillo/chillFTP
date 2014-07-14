@@ -8,7 +8,6 @@ module Filesystem where
 import System.Posix.Syslog (syslog, Priority(Notice))		-- For logging
 import System.Posix							-- For fileSize and getFileStatus
 import System.IO							-- For filehandles
---import System.IO.Error						-- For IO errors (like perm denied)
 import System.Directory						-- For filesystem interaction
 import qualified Data.ByteString.Lazy as BL	-- For moving binary data
 import Control.Exception					-- Handling exceptions
@@ -105,11 +104,16 @@ validatePath wd p
 copyData :: Handle -> Handle -> IO ()
 copyData fromFile toFile = do
 	contents <- BL.hGetContents fromFile
-	BL.hPut toFile contents
-	hFlush toFile
-	-- TODO: Make exception-safe with something like the following:
-	--handle (\ _ -> logMsg "Error reading or writing file") (BL.hPut toFile contents)
-	--handle (\ _ -> logMsg "Error flushing after data copy") (hFlush toFile)
+	catch (BL.hPut toFile contents)
+		(\e -> do
+			let err = show (e :: IOException)
+			logMsg ("Error reading or writing file: " ++ err)
+			return ())
+	catch (hFlush toFile)
+		(\e -> do
+			let err = show (e :: IOException)
+			logMsg ("Error flushing after data transfer: " ++ err)
+			return ())
 
 -- Shorthand for logging and debugging through the codebase
 logMsg :: String -> IO ()
