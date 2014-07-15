@@ -31,7 +31,7 @@ main :: IO ()
 main = do
 	sock <- bindServer
 	getGroupEntryForName "nobody" >>= setGroupID . groupID
-	getUserEntryForName "_ftp" >>= setUserID . userID
+	getUserEntryForName "nobody" >>= setUserID . userID
 	listenLoop sock
 
 
@@ -40,7 +40,7 @@ ftpServer = CreateDaemon {
 	privilegedAction = bindServer,	-- The result of bindServer
 	program = listenLoop,			-- is the argument to listenLoop
 	name = Just "chillFTP",
-	user = Just "_ftp",
+	user = Just "nobody",
 	group = Just "nobody",
 	syslogOptions = [],
 	pidfileDirectory = Nothing -- Default is /var/run
