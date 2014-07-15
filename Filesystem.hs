@@ -23,7 +23,11 @@ isReadableFile :: String -> IO Status
 isReadableFile path = do
 	isFile <- doesFileExist path
 	if (isFile) then do
-		perms <- getPermissions path
+		perms <- catch (getPermissions path)
+			(\e -> do
+				let err = show (e :: IOException)
+				logMsg ("Error: " ++ err)
+				return emptyPermissions)
 		if (readable perms) then
 			return Done
 		else
