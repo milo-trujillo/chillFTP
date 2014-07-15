@@ -84,9 +84,25 @@ handlePASV s requests = do
 			else
 				putMVar callback result
 		"RETR"	->	do
+			--(file, result) <- getFileHandle args ReadMode
+			-- Next two lines a hack until getFileHandle is finished
 			file <- openFile args ReadMode
-			copyData file s
-			putMVar callback Done
+			let result = Done
+			if (result == Done) then do
+				copyData file s
+				putMVar callback Done
+			else
+				putMVar callback result
+		"STOR"	->	do
+			--(file, result) <- getFileHandle args WriteMode
+			-- Next two lines a hack until getFileHandle is finished
+			file <- openFile args WriteMode
+			let result = Done
+			if (result == Done) then do
+				copyData s file
+				putMVar callback Done
+			else
+				putMVar callback result
 		"QUIT"	->	putMVar callback Done
 		_		->	hPutStrLn s "ERROR: Unknown command passed to PASV!" >>
 					putMVar callback Error

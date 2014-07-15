@@ -113,12 +113,30 @@ clientLoop s addr pasv wd = do
 				writeChan pasv (("RETR", path), callback)
 				status <- takeMVar callback
 				if (status == Done) then 
-					hPutStrLn s "226 Transfer complete fools."
+					hPutStrLn s "226 Transfer complete, fools."
 				else
 					handleStatus s status
 			else do
 				if (result /= Done) then handleStatus s result
 				else handleStatus s available
+		-- WARNING: STOR is not finished or secure at all!
+		-- Disable it or finish path validation before putting into production!
+		-- TODO: Finish STOR stub
+		"STOR"	->	do
+			current <- viewMVar wd
+			(path, result) <- validatePath current args
+			available <- isWritableFile path
+			-- This stuff belongs inside an if statement after validation
+			hPutStr s ("150 Opening BINARY mode data connection for ")
+			hPutStrLn s (args ++ ".")
+			callback <- newEmptyMVar
+			let path = current ++ "/" ++ args -- TEMPORARY HACK!
+			writeChan pasv (("STOR", path), callback)
+			status <- takeMVar callback
+			if (status == Done) then
+				hPutStrLn s "226 Transfer complete, fools."
+			else
+				handleStatus s status
 		"PASV"	->	do
 			let address = (getFTPAddr addr)
 			callback <- newEmptyMVar
