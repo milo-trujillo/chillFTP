@@ -16,9 +16,14 @@ Dependencies are minimal, requiring few libraries outside the Haskell and Racket
 ### Server
 The server depends on several standard packages:
 * Control.Concurrent
+* Control.Monad
+* Data.List
+* Data.ByteString.Lazy
 * Network.Socket
 * System.IO
 * System.Directory
+* System.Posix
+* Text.Printf
 
 It also requires System.Posix.Daemonize from the [hdaemonize](http://hackage.haskell.org/package/hdaemonize-0.4) library and System.Posix.Syslog from the [hsyslog](http://hackage.haskell.org/package/hsyslog-1.4) library.
 
