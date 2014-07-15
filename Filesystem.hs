@@ -10,6 +10,7 @@ import System.Posix							-- For fileSize and getFileStatus
 import System.IO							-- For filehandles
 import System.Directory						-- For filesystem interaction
 import Data.List							-- For sort
+import Data.Maybe							-- For Just/Maybe IO operations
 import qualified Data.ByteString.Lazy as BL	-- For moving binary data
 import Control.Exception					-- Handling exceptions
 
@@ -39,6 +40,18 @@ isReadableFile path = do
 		else
 			return NotFound
 
+-- Checks if a path does not exist, and the folder is writable
+isWritableFile :: String -> IO Status
+isWritableFile path = do
+	isFile <- doesFileExist path
+	isDir <- doesDirectoryExist path
+	-- We never let the client overwrite files, too insecure
+	if( isFile || isDir ) then return PermDenied
+	else do
+		-- TODO: Verify that the enclosing folder is writable
+		-- This stub is good enough for debugging, but needs finishing
+		return Done
+
 -- Checks if a directory exists and can be searched through
 isValidWD :: String -> IO Status
 isValidWD path = do
@@ -51,6 +64,28 @@ isValidWD path = do
 			return PermDenied
 	else
 		return NotFound
+
+-- Returns a handle to a file if possible
+-- Substantially more reliable than a raw openFile call
+{-
+getFileHandle :: FilePath -> IOMode -> (Handle, Status)
+getFileHandle path fileMode = do
+	file <- catch (Just openFile path fileMode)
+		(\e -> do
+			let err = show (e :: IOException)
+			logMsg ("Error: " ++ err)
+			return Nothing)
+	if (file /= Nothing) then
+		return (Just file, Done)
+	else do
+		isFile <- doesFileExist path
+		isDir <- doesDirectoryExist path
+		if (isFile || isDir) then
+			return (Just file, PermDenied) -- Handle must not be allowed
+		else
+			return (Just file, Error) -- Who knows, path invalid or something
+-}
+
 
 -- Returns size in bytes of a file
 getFileSize :: String -> IO FileOffset
