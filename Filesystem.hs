@@ -9,6 +9,7 @@ import System.Posix.Syslog (syslog, Priority(Notice))		-- For logging
 import System.Posix							-- For fileSize and getFileStatus
 import System.IO							-- For filehandles
 import System.Directory						-- For filesystem interaction
+import Data.List							-- For sort
 import qualified Data.ByteString.Lazy as BL	-- For moving binary data
 import Control.Exception					-- Handling exceptions
 
@@ -82,7 +83,7 @@ getFileList path = do
 		return ([], available)
 	else do
 		names <- getDirectoryContents path
-		return (names, Done)
+		return ((sort names), Done)
 
 -- Given a working directory and a path, returns a simplified path
 -- The file or directory is also guaranteed to exist, but _not_ be be accessible
