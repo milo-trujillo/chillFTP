@@ -58,6 +58,8 @@ clientLoop s addr pasv wd = do
 			hPutStrLn s " PASV"
 			hPutStrLn s " SIZE"
 			hPutStrLn s "211 End"
+		"HELP"	->	do
+			hPutStrLn s "250 To reach the system administrator, try prayer."
 		-- TODO: Implement real TYPE functionality
 		"TYPE"	->	do -- Stub function to make ftp clients happy
 			hPutStrLn s ("200 Type set to I.")
@@ -96,7 +98,9 @@ clientLoop s addr pasv wd = do
 			if (result == Done && available == Done) then do
 				size <- getFileSize path
 				hPutStrLn s ("213 " ++ (show size))
-			else handleStatus s available
+			else do
+				if (result /= Done) then handleStatus s result
+				else handleStatus s available
 		"RETR"	->	do
 			current <- viewMVar wd
 			(path, result) <- validatePath current args
@@ -112,7 +116,9 @@ clientLoop s addr pasv wd = do
 					hPutStrLn s "226 Transfer complete fools."
 				else
 					handleStatus s status
-			else handleStatus s available
+			else do
+				if (result /= Done) then handleStatus s result
+				else handleStatus s available
 		"PASV"	->	do
 			let address = (getFTPAddr addr)
 			callback <- newEmptyMVar
@@ -155,6 +161,6 @@ handleStatus :: Handle -> Status -> IO ()
 handleStatus s status = do
 	case status of
 		PermDenied	->	hPutStrLn s "550 Permission denied."
-		NotFound	->	hPutStrLn s "550 Folder not found."
+		NotFound	->	hPutStrLn s "550 File not found."
 		Error	->	hPutStrLn s "550 Unexpected error."
 		Done	->	return () -- This should be handled _before_ calling us
